@@ -6,25 +6,28 @@ import "hardhat/console.sol";
 contract Identeefi {
     address public owner;
 
-    struct Product {
-        string name;
-        string serialNumber;
-        string description;
-        string brand;
-        string image;
-        mapping(uint => ProductHistory) history;
-        uint historySize;
-    }
-
-    mapping(string => Product) products;
-    mapping(uint => ProductHistory) history;
-
     struct ProductHistory {
         uint id;
         string actor;
         string location;
         string timestamp;
         bool isSold;
+    }
+
+    struct Product {
+        string name;
+        string serialNumber;
+        string description;
+        string brand;
+        string image;
+        uint historySize;
+    }
+
+    mapping(string => Product) public products;
+    mapping(string => ProductHistory[]) public productHistories; // Store history separately
+
+    constructor() {
+        owner = msg.sender;
     }
 
     function registerProduct(
@@ -37,14 +40,19 @@ contract Identeefi {
         string memory _location,
         string memory _timestamp
     ) public {
-        Product storage p = products[_serialNumber];
+        require(
+            bytes(products[_serialNumber].serialNumber).length == 0,
+            "Product already registered"
+        );
 
-        p.name = _name;
-        p.brand = _brand;
-        p.serialNumber = _serialNumber;
-        p.description = _description;
-        p.image = _image;
-        p.historySize = 0;
+        products[_serialNumber] = Product({
+            name: _name,
+            brand: _brand,
+            serialNumber: _serialNumber,
+            description: _description,
+            image: _image,
+            historySize: 0
+        });
 
         addProductHistory(_serialNumber, _actor, _location, _timestamp, false);
     }
@@ -56,25 +64,23 @@ contract Identeefi {
         string memory _timestamp,
         bool _isSold
     ) public {
-        Product storage p = products[_serialNumber];
-        p.historySize++;
-        p.history[p.historySize] = ProductHistory(
-            p.historySize,
-            _actor,
-            _location,
-            _timestamp,
-            _isSold
+        require(
+            bytes(products[_serialNumber].serialNumber).length != 0,
+            "Product does not exist"
         );
 
-        console.log("i1: %s", p.historySize);
-        console.log(
-            "Product History added: %s",
-            p.history[p.historySize].actor
+        uint historyId = products[_serialNumber].historySize + 1;
+        productHistories[_serialNumber].push(
+            ProductHistory(historyId, _actor, _location, _timestamp, _isSold)
         );
-        console.log("Product : %s", p.name);
+
+        products[_serialNumber].historySize++;
+
+        console.log("Product History added: %s", _actor);
+        console.log("Product : %s", products[_serialNumber].name);
     }
 
-    function getProduct(
+    function getProductDetails(
         string memory _serialNumber
     )
         public
@@ -85,16 +91,13 @@ contract Identeefi {
             string memory,
             string memory,
             string memory,
-            ProductHistory[] memory
+            uint
         )
     {
-        ProductHistory[] memory pHistory = new ProductHistory[](
-            products[_serialNumber].historySize
+        require(
+            bytes(products[_serialNumber].serialNumber).length != 0,
+            "Product does not exist"
         );
-
-        for (uint i = 0; i < products[_serialNumber].historySize; i++) {
-            pHistory[i] = products[_serialNumber].history[i + 1];
-        }
 
         return (
             products[_serialNumber].serialNumber,
@@ -102,7 +105,18 @@ contract Identeefi {
             products[_serialNumber].brand,
             products[_serialNumber].description,
             products[_serialNumber].image,
-            pHistory
+            products[_serialNumber].historySize
         );
+    }
+
+    function getProductHistory(
+        string memory _serialNumber
+    ) public view returns (ProductHistory[] memory) {
+        require(
+            bytes(products[_serialNumber].serialNumber).length != 0,
+            "Product does not exist"
+        );
+
+        return productHistories[_serialNumber];
     }
 }

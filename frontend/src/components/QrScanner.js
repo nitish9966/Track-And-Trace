@@ -1,29 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { QrReader } from 'react-qr-reader';
 
-const QrScanner = (props) => {
-  const [data, setData] = useState('');
-
-  useEffect(() => {
-    console.info(data);
-    props.passData(data);
-  }, [data]);
-
+const QrScanner = ({ passData }) => {
   return (
-    <>
-      <QrReader
-        onResult={(result, error) => {
-          if (result) {
-            setData(result?.text);
-          }
-
-          // if (error) {
-          //   console.info(error);
-          // }
-        }}
-        style={{ width: '100%' }}
-      />
-    </>
+    <QrReader
+      onResult={(result, error) => {
+        if (result) {
+          passData(result.text); // Pass data directly instead of using useState
+        }
+      }}
+      style={{ width: '100%' }}
+    />
   );
 };
 

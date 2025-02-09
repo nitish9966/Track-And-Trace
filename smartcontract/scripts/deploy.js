@@ -1,18 +1,15 @@
+const hre = require("hardhat");
+
 const main = async () => {
   const [deployer] = await hre.ethers.getSigners();
-  const accountBalance = await deployer.getBalance();
-
-  console.log("Deploying contracts with account: ", deployer.address);
-  console.log("Account balance: ", accountBalance.toString());
+  console.log("Deploying contracts with account:", deployer.address);
+  console.log("Account balance:", (await deployer.getBalance()).toString());
 
   const productContractFactory = await hre.ethers.getContractFactory("Identeefi");
   const productContract = await productContractFactory.deploy();
   await productContract.deployed();
 
-  console.log("Identeefi address: ", productContract.address);
-
-
-
+  console.log("Identeefi Contract deployed at:", productContract.address);
 };
 
 const runMain = async () => {
@@ -20,7 +17,7 @@ const runMain = async () => {
     await main();
     process.exit(0);
   } catch (error) {
-    console.log(error);
+    console.error("Deployment failed:", error);
     process.exit(1);
   }
 };

@@ -75,7 +75,7 @@ const UpdateProduct = () => {
     filepreview: null,
   });
 
-  const CONTRACT_ADDRESS = "0x62081f016446585cCC507528cc785980296b4Ccd";
+  const CONTRACT_ADDRESS = "0x5BaAd2F8d16f2c32243aA12Dcb3bfE7D1ea67504";
   const CONTRACT_ABI = abi.abi;
 
   const { auth } = useAuth();
@@ -102,7 +102,7 @@ const UpdateProduct = () => {
   const getImage = async (imageName) => {
     setImage((prevState) => ({
       ...prevState,
-      filepreview: `http://localhost:5000/file/product/${imageName}`,
+      filepreview: `http://localhost:5000/file/product/${serialNumber}.png`,
     }));
   };
 
@@ -130,9 +130,9 @@ const UpdateProduct = () => {
           const product = await productContract.getProduct(data[1].toString());
 
           // setProductData(product.toString())
-
-          console.log("Retrieved product...", product);
           setData(product.toString());
+          console.log("Retrieved product...", product);
+          // setData(product.toString());
         } else {
           console.log("Ethereum object doesn't exist!");
           alert(
