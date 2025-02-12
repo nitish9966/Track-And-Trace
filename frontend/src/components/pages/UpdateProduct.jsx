@@ -11,187 +11,111 @@ import TimelineOppositeContent, {
 } from "@mui/lab/TimelineOppositeContent";
 import dayjs from "dayjs";
 import { useLocation, useNavigate } from "react-router-dom";
-import abi from "../../utils/Identeefi.json";
 import { useEffect, useState } from "react";
-import useAuth from "../../hooks/useAuth";
-import { ethers } from "ethers";
 import axios from "axios";
 
-const getEthereumObject = () => window.ethereum;
-
-/*
- * This function returns the first linked account found.
- * If there is no account linked, it will return null.
- */
-const findMetaMaskAccount = async () => {
-  try {
-    const ethereum = getEthereumObject();
-
-    /*
-     * First make sure we have access to the Ethereum object.
-     */
-    if (!ethereum) {
-      console.error("Make sure you have Metamask!");
-      return null;
-    }
-
-    console.log("We have the Ethereum object", ethereum);
-    const accounts = await ethereum.request({ method: "eth_accounts" });
-
-    if (accounts.length !== 0) {
-      const account = accounts[0];
-      console.log("Found an authorized account:", account);
-      return account;
-    } else {
-      console.error("No authorized account found");
-      return null;
-    }
-  } catch (error) {
-    console.error(error);
-    return null;
-  }
-};
-
 const UpdateProduct = () => {
-  const [currentAccount, setCurrentAccount] = useState("");
-  const [suppDate, setSuppDate] = useState("");
-  const [suppLatitude, setSuppLatitude] = useState("");
-  const [suppLongtitude, setSuppLongtitude] = useState("");
-  const [suppName, setSuppName] = useState("");
-  const [suppLocation, setSuppLocation] = useState("");
-  const [loading, setLoading] = useState("");
+  // State for product details (from product table)
   const [serialNumber, setSerialNumber] = useState("");
-  const [productData, setProductData] = useState("");
-
-  const [name, setName] = useState("P");
+  const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [description, setDescription] = useState("");
-  const [imageName, setImageName] = useState("");
-  const [history, setHistory] = useState([]);
   const [isSold, setIsSold] = useState(false);
+  const [image, setImage] = useState({ file: [], filepreview: null });
 
-  const [image, setImage] = useState({
-    file: [],
-    filepreview: null,
-  });
+  // State for product history (from product_history table)
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState("");
 
-  const CONTRACT_ADDRESS = "0x5BaAd2F8d16f2c32243aA12Dcb3bfE7D1ea67504";
-  const CONTRACT_ABI = abi.abi;
-
-  const { auth } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const qrData = location.state?.qrData;
 
-  console.log("qrData", qrData);
-
+  // When component mounts or qrData changes, fetch product details and history.
   useEffect(() => {
-    console.log("useEffect 1");
-
-    findMetaMaskAccount().then((account) => {
-      if (account !== null) {
-        setCurrentAccount(account);
-      }
-    });
-
     if (qrData) {
       handleScan(qrData);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrData]);
 
+  // Helper: Build the image URL based on the filename from the backend.
   const getImage = async (imageName) => {
     setImage((prevState) => ({
       ...prevState,
-      filepreview: `http://localhost:5000/file/product/${serialNumber}.png`,
+      filepreview: `http://localhost:5000/file/product/${imageName}`,
     }));
   };
 
+  // Fetch product details from the product table.
   const handleScan = async (qrData) => {
+    // Assuming qrData is in the format "someValue,serialNumber"
     const data = qrData.split(",");
-    const contractAddress = data[0];
-    setSerialNumber(data[1]);
+    const serial = data[1];
+    setSerialNumber(serial);
 
-    console.log("contract address", contractAddress);
-    console.log("serial number", data[1]);
-
-    if (contractAddress === CONTRACT_ADDRESS) {
-      try {
-        const { ethereum } = window;
-
-        if (ethereum) {
-          const provider = new ethers.providers.Web3Provider(ethereum);
-          const signer = provider.getSigner();
-          const productContract = new ethers.Contract(
-            CONTRACT_ADDRESS,
-            CONTRACT_ABI,
-            signer
-          );
-
-          const product = await productContract.getProduct(data[1].toString());
-
-          // setProductData(product.toString())
-          setData(product.toString());
-          console.log("Retrieved product...", product);
-          // setData(product.toString());
-        } else {
-          console.log("Ethereum object doesn't exist!");
-          alert(
-            "Ethereum object doesn't exist! Please connect your wallet first!"
-          );
-        }
-      } catch (error) {
-        console.log(error);
+    try {
+      const response = await axios.get(
+        `http://localhost:5000/product/${serial}`
+      );
+      if (response.status === 200) {
+        const product = response.data;
+        await setProductData(product);
+      } else {
+        console.error("Failed to fetch product details:", response.statusText);
       }
+    } catch (error) {
+      console.error("Error fetching product details:", error);
     }
   };
 
-  const setData = (d) => {
-    console.log("product data: ", d);
+  // Update state with product details and then fetch product history.
+  const setProductData = async (product) => {
+    setName(product.name || "");
+    setBrand(product.brand || "");
+    setDescription(product.description || "");
+    setSerialNumber(product.serialNumber || "");
+    // Set default isSold from product table.
+    setIsSold(product.is_sold || product.isSold || false);
+    getImage(product.image || `${product.serialNumber}.png`);
 
-    const arr = d.split(",");
-    console.log("arr", arr);
-
-    setName(arr[1]);
-    setBrand(arr[2]);
-    setDescription(arr[3].replace(/;/g, ","));
-    // setImageName(arr[4]);
-    getImage(arr[4]);
-
-    const hist = [];
-    let start = 5;
-
-    for (let i = 5; i < arr.length; i += 5) {
-      const actor = arr[start + 1];
-      const location = arr[start + 2].replace(/;/g, ",");
-      const timestamp = arr[start + 3];
-      const isSold = arr[start + 4] === "true" ? setIsSold(true) : false;
-
-      hist.push({
-        actor,
-        location,
-        timestamp,
-        isSold,
-      });
-
-      start += 5;
+    try {
+      const historyRes = await axios.get(
+        `http://localhost:5000/product_history/${product.serialNumber}`
+      );
+      if (historyRes.status === 200) {
+        // Sort history records in ascending order (oldest first)
+        const sortedHistory = historyRes.data.sort(
+          (a, b) => a.timestamp - b.timestamp
+        );
+        setHistory(sortedHistory);
+        // If history exists, update isSold with the last record's is_sold value.
+        if (sortedHistory.length > 0) {
+          setIsSold(sortedHistory[sortedHistory.length - 1].is_sold);
+        }
+      } else {
+        console.error(
+          "Failed to fetch product history:",
+          historyRes.statusText
+        );
+        setHistory([]);
+      }
+    } catch (error) {
+      console.error("Error fetching product history:", error);
+      setHistory([]);
     }
-    console.log("hist", hist);
-    setHistory(hist);
   };
 
   const handleBack = () => {
-    navigate(-1);
+    navigate(-2);
   };
 
+  // Render the product history timeline.
   const getHistory = () => {
     return history.map((item, index) => {
-      const date = dayjs(item.timestamp * 1000).format("MM/DD/YYYY");
-      const time = dayjs(item.timestamp * 1000).format("HH:mm a");
-
-      // if (item.isSold) {
-      //     setIsSold(true);
-      // }
-
+      const ts = item.timestamp ? Number(item.timestamp) : 0;
+      const date = dayjs(ts * 1000).format("MM/DD/YYYY");
+      const time = dayjs(ts * 1000).format("HH:mm a");
       return (
         <TimelineItem key={index}>
           <TimelineOppositeContent color="textSecondary">
@@ -210,11 +134,10 @@ const UpdateProduct = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    navigate("/update-product-details", { state: { qrData } });
-  };
+  // Determine if the "Update Product" button should be displayed.
+  // Show the button if there is no history OR the last history record's is_sold is not true.
+  const canUpdate =
+    history.length === 0 || history[history.length - 1].is_sold !== true;
 
   return (
     <Box
@@ -243,12 +166,13 @@ const UpdateProduct = () => {
           backgroundColor: "#e3eefc",
         }}
       >
-        <Box
-          sx={{
-            textAlign: "center",
-            marginBottom: "5%",
-          }}
+        <Typography
+          variant="body2"
+          sx={{ textAlign: "center", marginTop: "3%" }}
         >
+          Your Product is Authentic!
+        </Typography>
+        <Box sx={{ textAlign: "center", marginBottom: "5%" }}>
           <Typography
             variant="h2"
             sx={{
@@ -268,7 +192,6 @@ const UpdateProduct = () => {
               flexDirection: "row",
               justifyContent: "flex-start",
               alignItems: "center",
-              flex: 1,
               width: "100%",
               marginTop: "5%",
               marginBottom: "5%",
@@ -279,9 +202,7 @@ const UpdateProduct = () => {
                 marginRight: "1.5%",
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "flex-start",
                 alignItems: "center",
-                flex: "0 0 35%",
                 width: "35%",
               }}
             >
@@ -291,7 +212,6 @@ const UpdateProduct = () => {
                 sx={{
                   width: 100,
                   height: 100,
-                  margin: "auto",
                   marginBottom: "3%",
                   backgroundColor: "#3f51b5",
                 }}
@@ -304,49 +224,31 @@ const UpdateProduct = () => {
                 marginLeft: "1.5%",
                 display: "flex",
                 flexDirection: "column",
-                justifyContent: "flex-start",
-                alignItems: "left",
-                flex: "0 0 65%",
+                alignItems: "flex-start",
                 width: "65%",
               }}
             >
               <Typography
                 variant="body1"
-                sx={{
-                  textAlign: "left",
-                  marginBottom: "5%",
-                }}
+                sx={{ textAlign: "left", marginBottom: "5%" }}
               >
-                {name}
-                {/* Product Name */}
+                Name: {name}
               </Typography>
-
               <Typography
                 variant="body2"
-                sx={{
-                  textAlign: "left",
-                  marginBottom: "3%",
-                }}
+                sx={{ textAlign: "left", marginBottom: "3%" }}
               >
                 Serial Number: {serialNumber}
               </Typography>
-
               <Typography
                 variant="body2"
-                sx={{
-                  textAlign: "left",
-                  marginBottom: "3%",
-                }}
+                sx={{ textAlign: "left", marginBottom: "3%" }}
               >
                 Description: {description}
               </Typography>
-
               <Typography
                 variant="body2"
-                sx={{
-                  textAlign: "left",
-                  marginBottom: "3%",
-                }}
+                sx={{ textAlign: "left", marginBottom: "3%" }}
               >
                 Brand: {brand}
               </Typography>
@@ -355,9 +257,7 @@ const UpdateProduct = () => {
 
           <Timeline
             sx={{
-              [`& .${timelineOppositeContentClasses.root}`]: {
-                flex: 0.2,
-              },
+              [`& .${timelineOppositeContentClasses.root}`]: { flex: 0.2 },
             }}
           >
             {getHistory()}
@@ -374,45 +274,41 @@ const UpdateProduct = () => {
             </TimelineItem>
           </Timeline>
 
-          {loading === "" ? null : (
+          {loading !== "" && (
             <Typography
               variant="body2"
-              sx={{
-                textAlign: "center",
-                marginTop: "3%",
-              }}
+              sx={{ textAlign: "center", marginTop: "3%" }}
             >
               {loading}
             </Typography>
           )}
 
-          <Button
-            variant="contained"
-            type="submit"
-            sx={{
-              width: "50%",
-              marginTop: "3%",
-              backgroundColor: "#98b5d5",
-              "&:hover": { backgroundColor: "#618dbd" },
-            }}
-            onClick={handleSubmit}
+          <Box
+            sx={{ width: "100%", display: "flex", justifyContent: "center" }}
           >
-            Update Product
-          </Button>
+            {canUpdate && (
+              <Button
+                variant="contained"
+                type="submit"
+                sx={{
+                  width: "50%",
+                  marginTop: "3%",
+                  backgroundColor: "#98b5d5",
+                  "&:hover": { backgroundColor: "#618dbd" },
+                }}
+                onClick={() =>
+                  navigate("/update-product-details", { state: { qrData } })
+                }
+              >
+                Update Product
+              </Button>
+            )}
+          </Box>
 
           <Box
-            sx={{
-              width: "100%",
-              display: "flex",
-              justifyContent: "center",
-            }}
+            sx={{ width: "100%", display: "flex", justifyContent: "center" }}
           >
-            <Button
-              onClick={handleBack}
-              sx={{
-                marginTop: "5%",
-              }}
-            >
+            <Button onClick={handleBack} sx={{ marginTop: "5%" }}>
               Back
             </Button>
           </Box>

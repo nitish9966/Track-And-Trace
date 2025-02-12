@@ -1,42 +1,44 @@
-import { Box, Paper, Typography, Autocomplete } from "@mui/material";
+import {
+  Box,
+  Paper,
+  TextField,
+  Typography,
+  Button,
+  Autocomplete,
+} from "@mui/material";
 import bgImg from "../../img/bg.png";
-import { TextField, Button } from "@mui/material";
-import { useEffect, useState } from "react";
-import useAuth from "../../hooks/useAuth";
-import { ethers } from "ethers";
-import axios from "axios";
-import Geocode from "react-geocode";
+import Timeline from "@mui/lab/Timeline";
+import TimelineItem from "@mui/lab/TimelineItem";
+import TimelineSeparator from "@mui/lab/TimelineSeparator";
+import TimelineConnector from "@mui/lab/TimelineConnector";
+import TimelineContent from "@mui/lab/TimelineContent";
+import TimelineDot from "@mui/lab/TimelineDot";
+import TimelineOppositeContent, {
+  timelineOppositeContentClasses,
+} from "@mui/lab/TimelineOppositeContent";
 import dayjs from "dayjs";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import abi from "../../utils/Identeefi.json";
+import useAuth from "../../hooks/useAuth";
+import { ethers } from "ethers";
+import Geocode from "react-geocode";
 
 const options = ["true", "false"];
 
 const getEthereumObject = () => window.ethereum;
 
-/*
- * This function returns the first linked account found.
- * If there is no account linked, it will return null.
- */
 const findMetaMaskAccount = async () => {
   try {
     const ethereum = getEthereumObject();
-
-    /*
-     * First make sure we have access to the Ethereum object.
-     */
     if (!ethereum) {
       console.error("Make sure you have Metamask!");
       return null;
     }
-
-    console.log("We have the Ethereum object", ethereum);
     const accounts = await ethereum.request({ method: "eth_accounts" });
-
     if (accounts.length !== 0) {
-      const account = accounts[0];
-      console.log("Found an authorized account:", account);
-      return account;
+      return accounts[0];
     } else {
       console.error("No authorized account found");
       return null;
@@ -48,6 +50,7 @@ const findMetaMaskAccount = async () => {
 };
 
 const UpdateProductDetails = () => {
+  // State for blockchain-related and product fields (from product table)
   const [currentAccount, setCurrentAccount] = useState("");
   const [currDate, setCurrDate] = useState("");
   const [currLatitude, setCurrLatitude] = useState("");
@@ -58,6 +61,7 @@ const UpdateProductDetails = () => {
   const [isSold, setIsSold] = useState(false);
   const [loading, setLoading] = useState("");
 
+  // Blockchain contract details
   const CONTRACT_ADDRESS = "0x5BaAd2F8d16f2c32243aA12Dcb3bfE7D1ea67504";
   const CONTRACT_ABI = abi.abi;
 
@@ -66,66 +70,40 @@ const UpdateProductDetails = () => {
   const location = useLocation();
   const qrData = location.state?.qrData;
 
+  // On mount: parse QR data and get blockchain account.
   useEffect(() => {
-    console.log("qrdata", qrData);
-    const data = qrData.split(",");
-    // const contractAddress = data[0];
-    setSerialNumber(data[1]);
-    console.log("serialNumber", serialNumber);
-
+    if (qrData) {
+      // Expected format: "someValue,serialNumber"
+      const data = qrData.split(",");
+      const serial = data[1];
+      setSerialNumber(serial);
+    }
     findMetaMaskAccount().then((account) => {
-      if (account !== null) {
-        setCurrentAccount(account);
-      }
+      if (account) setCurrentAccount(account);
     });
-  });
+  }, [qrData]);
 
+  // On mount: fetch profile name and current time/location.
   useEffect(() => {
-    console.log("useEffect 3");
-
     getUsername();
     getCurrentTimeLocation();
   }, []);
 
+  // Get manufacturer location details using Geocode.
   useEffect(() => {
-    Geocode.setApiKey("AIzaSyB5MSbxR9Vuj1pPeGvexGvQ3wUel4znfYY");
-
-    Geocode.fromLatLng(currLatitude, currLongtitude).then(
-      (response) => {
-        const address = response.results[0].formatted_address;
-        let city, state, country;
-        for (
-          let i = 0;
-          i < response.results[0].address_components.length;
-          i++
-        ) {
-          for (
-            let j = 0;
-            j < response.results[0].address_components[i].types.length;
-            j++
-          ) {
-            switch (response.results[0].address_components[i].types[j]) {
-              case "locality":
-                city = response.results[0].address_components[i].long_name;
-                break;
-              case "administrative_area_level_1":
-                state = response.results[0].address_components[i].long_name;
-                break;
-              case "country":
-                country = response.results[0].address_components[i].long_name;
-                break;
-            }
-          }
+    Geocode.setApiKey("YOUR_GOOGLE_API_KEY_HERE");
+    if (currLatitude && currLongtitude) {
+      Geocode.fromLatLng(currLatitude, currLongtitude).then(
+        (response) => {
+          const address = response.results[0].formatted_address;
+          setCurrLocation(address.replace(/,/g, ";"));
+          console.log("Address:", address);
+        },
+        (error) => {
+          console.error(error);
         }
-
-        setCurrLocation(address.replace(/,/g, ";"));
-        console.log("city, state, country: ", city, state, country);
-        console.log("address:", address);
-      },
-      (error) => {
-        console.error(error);
-      }
-    );
+      );
+    }
   }, [currLatitude, currLongtitude]);
 
   const getCurrentTimeLocation = () => {
@@ -136,21 +114,22 @@ const UpdateProductDetails = () => {
     });
   };
 
-  const getUsername = async (e) => {
-    const res = await axios
-      .get(`http://localhost:5000/profile/${auth.user}`)
-      .then((res) => {
-        console.log(JSON.stringify(res?.data[0]));
-        setCurrName(res?.data[0].name);
-      });
+  const getUsername = async () => {
+    try {
+      const res = await axios.get(`http://localhost:5000/profile/${auth.user}`);
+      if (res.data && res.data[0]) {
+        setCurrName(res.data[0].name);
+      }
+    } catch (error) {
+      console.error("Error fetching username:", error);
+    }
   };
 
+  // Function to update product details (blockchain call + DB record)
   const updateProduct = async (e) => {
     e.preventDefault();
-
     try {
       const { ethereum } = window;
-
       if (ethereum) {
         const provider = new ethers.providers.Web3Provider(ethereum);
         const signer = provider.getSigner();
@@ -160,9 +139,9 @@ const UpdateProductDetails = () => {
           signer
         );
 
-        console.log("here");
+        console.log("Initiating blockchain update...");
 
-        // write transactions
+        // Call blockchain function to add a new history record
         const registerTxn = await productContract.addProductHistory(
           serialNumber,
           currName,
@@ -170,28 +149,35 @@ const UpdateProductDetails = () => {
           currDate.toString(),
           Boolean(isSold)
         );
-        console.log("Mining (Adding Product History) ...", registerTxn.hash);
-        setLoading("Mining (Add Product History) ...", registerTxn.hash);
-
+        setLoading("Mining (Add Product History) ... " + registerTxn.hash);
         await registerTxn.wait();
-        console.log("Mined (Add Product History) --", registerTxn.hash);
-        setLoading("Mined (Add Product History) --", registerTxn.hash);
+        setLoading("Mined (Add Product History) -- " + registerTxn.hash);
 
-        const product = await productContract.getProduct(serialNumber);
+        // Now also store this update in the product_history table via the backend.
+        await axios.post(
+          "http://localhost:5000/addproduct_history",
+          {
+            serialNumber: serialNumber,
+            actor: currName,
+            location: currLocation,
+            timestamp: currDate,
+            is_sold: isSold,
+          },
+          { headers: { "Content-Type": "application/json" } }
+        );
 
-        console.log("Retrieved product...", product);
         setLoading("Done! Product details updated successfully!");
       } else {
         console.log("Ethereum object doesn't exist!");
       }
     } catch (error) {
-      console.log(error);
+      console.error("Error updating product:", error);
+      setLoading("Error updating product");
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("here");
     setLoading(
       "Please pay the transaction fee to update the product details..."
     );
@@ -202,6 +188,8 @@ const UpdateProductDetails = () => {
     navigate(-1);
   };
 
+  // For demonstration, we assume the product details (name, etc.) are already displayed on this page.
+  // You can add additional TextFields if needed.
   return (
     <Box
       sx={{
@@ -244,16 +232,13 @@ const UpdateProductDetails = () => {
 
         <TextField
           fullWidth
-          id="outlined-disabled"
           margin="normal"
           label="Serial Number"
           disabled
           value={serialNumber}
         />
-
         <TextField
           fullWidth
-          id="outlined-disabled"
           margin="normal"
           label="Name"
           disabled
@@ -261,7 +246,6 @@ const UpdateProductDetails = () => {
         />
         <TextField
           fullWidth
-          id="outlined-disabled"
           margin="normal"
           label="Location"
           disabled
@@ -271,55 +255,42 @@ const UpdateProductDetails = () => {
         />
         <TextField
           fullWidth
-          id="outlined-disabled"
           margin="normal"
           label="Date"
           disabled
           value={dayjs(currDate * 1000).format("MMMM D, YYYY h:mm A")}
         />
 
-        {auth.role === "supplier" ? null : (
-          <Autocomplete
-            disablePortal
-            id="combo-box-demo"
-            options={options}
-            fullWidth
-            value={isSold}
-            onChange={(event, newVal) => {
-              setIsSold(newVal);
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                fullWidth
-                id="outlined-basic"
-                margin="normal"
-                label="Is Sold?"
-                variant="outlined"
-                inherit="False"
-              />
-            )}
-          />
-        )}
-        {loading === "" ? null : (
+        <Autocomplete
+          disablePortal
+          id="combo-box-demo"
+          options={options}
+          fullWidth
+          value={isSold}
+          onChange={(event, newVal) => {
+            setIsSold(newVal);
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              fullWidth
+              margin="normal"
+              label="Is Sold?"
+              variant="outlined"
+            />
+          )}
+        />
+
+        {loading !== "" && (
           <Typography
             variant="body2"
-            sx={{
-              textAlign: "center",
-              marginTop: "3%",
-            }}
+            sx={{ textAlign: "center", marginTop: "3%" }}
           >
             {loading}
           </Typography>
         )}
 
-        <Box
-          sx={{
-            width: "100%",
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
+        <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
           <Button
             variant="contained"
             type="submit"
@@ -336,19 +307,8 @@ const UpdateProductDetails = () => {
           </Button>
         </Box>
 
-        <Box
-          sx={{
-            width: "100%",
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <Button
-            onClick={handleBack}
-            sx={{
-              marginTop: "5%",
-            }}
-          >
+        <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+          <Button onClick={handleBack} sx={{ marginTop: "5%" }}>
             Back
           </Button>
         </Box>

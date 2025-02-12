@@ -11,86 +11,132 @@ import TimelineOppositeContent, {
 } from "@mui/lab/TimelineOppositeContent";
 import dayjs from "dayjs";
 import { useLocation, useNavigate } from "react-router-dom";
-import abi from "../../utils/Identeefi.json";
 import { useEffect, useState } from "react";
-import { ethers } from "ethers";
-
-const CONTRACT_ADDRESS = "0x5BaAd2F8d16f2c32243aA12Dcb3bfE7D1ea67504";
-const CONTRACT_ABI = abi.abi;
+import axios from "axios";
 
 const Product = () => {
-  const [currentAccount, setCurrentAccount] = useState("");
+  // State for product details from the product table
   const [serialNumber, setSerialNumber] = useState("");
-  const [name, setName] = useState("P");
+  const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [description, setDescription] = useState("");
-  const [history, setHistory] = useState([]);
   const [isSold, setIsSold] = useState(false);
-  const [image, setImage] = useState({ filepreview: null });
+  const [image, setImage] = useState({ file: [], filepreview: null });
+
+  // State for product history from the product_history table
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState("");
 
   const navigate = useNavigate();
   const location = useLocation();
   const qrData = location.state?.qrData;
 
+  // When component mounts (or qrData changes), fetch product details and history.
   useEffect(() => {
-    const checkMetaMask = async () => {
-      if (!window.ethereum) {
-        console.error("MetaMask is required!");
-        return;
-      }
-      try {
-        const accounts = await window.ethereum.request({
-          method: "eth_accounts",
-        });
-        if (accounts.length > 0) {
-          setCurrentAccount(accounts[0]);
-        }
-      } catch (error) {
-        console.error("Error connecting to MetaMask:", error);
-      }
-    };
-    checkMetaMask();
-    if (qrData) handleScan(qrData);
+    if (qrData) {
+      handleScan(qrData);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrData]);
 
+  // Helper to build the image URL based on the filename from the backend.
+  const getImage = async (imageName) => {
+    setImage((prevState) => ({
+      ...prevState,
+      filepreview: `http://localhost:5000/file/product/${imageName}`,
+    }));
+  };
+
+  // Fetch product details from the product table.
   const handleScan = async (qrData) => {
+    // Assuming qrData is in the format "someValue,serialNumber"
+    const data = qrData.split(",");
+    const serial = data[1];
+    setSerialNumber(serial);
+
     try {
-      const [contractAddress, serial] = qrData.split(",");
-      if (contractAddress !== CONTRACT_ADDRESS) {
-        console.error("Invalid contract address");
-        return;
-      }
-      setSerialNumber(serial);
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const productContract = new ethers.Contract(
-        CONTRACT_ADDRESS,
-        CONTRACT_ABI,
-        signer
+      const response = await axios.get(
+        `http://localhost:5000/product/${serial}`
       );
-      const product = await productContract.getProduct(serial);
-      updateProductData(product);
+      if (response.status === 200) {
+        const product = response.data;
+        await setProductData(product);
+      } else {
+        console.error("Failed to fetch product details:", response.statusText);
+      }
     } catch (error) {
-      console.error("Error fetching product data:", error);
+      console.error("Error fetching product details:", error);
     }
   };
 
-  const updateProductData = (data) => {
-    const arr = data.split(",");
-    setName(arr[1]);
-    setBrand(arr[2]);
-    setDescription(arr[3].replace(/;/g, ","));
-    setImage({ filepreview: `http://localhost:5000/file/product/${arr[4]}` });
-    const historyData = [];
-    for (let i = 5; i < arr.length; i += 5) {
-      historyData.push({
-        actor: arr[i + 1],
-        location: arr[i + 2].replace(/;/g, ","),
-        timestamp: arr[i + 3],
-        isSold: arr[i + 4] === "true",
-      });
+  // Update state with product details and fetch history separately.
+  const setProductData = async (product) => {
+    setName(product.name || "");
+    setBrand(product.brand || "");
+    setDescription(product.description || "");
+    setSerialNumber(product.serialNumber || "");
+    // Do not immediately set isSold; update it after fetching history.
+    getImage(product.image || `${product.serialNumber}.png`);
+
+    // Now fetch product history from the product_history table.
+    try {
+      const historyRes = await axios.get(
+        `http://localhost:5000/product_history/${product.serialNumber}`
+      );
+      if (historyRes.status === 200) {
+        // Sort the history records in ascending order (oldest first)
+        const sortedHistory = historyRes.data.sort(
+          (a, b) => a.timestamp - b.timestamp
+        );
+        setHistory(sortedHistory);
+        // If there is at least one history record, update isSold from the last record.
+        if (sortedHistory.length > 0) {
+          setIsSold(sortedHistory[sortedHistory.length - 1].is_sold);
+        } else {
+          // Fallback to the product's isSold value.
+          setIsSold(product.is_sold || product.isSold || false);
+        }
+      } else {
+        console.error(
+          "Failed to fetch product history:",
+          historyRes.statusText
+        );
+        setHistory([]);
+        setIsSold(product.is_sold || product.isSold || false);
+      }
+    } catch (error) {
+      console.error("Error fetching product history:", error);
+      setHistory([]);
+      setIsSold(product.is_sold || product.isSold || false);
     }
-    setHistory(historyData);
+  };
+
+  // Render the product history timeline.
+  const getHistory = () => {
+    return history.map((item, index) => {
+      const ts = item.timestamp ? Number(item.timestamp) : 0;
+      const date = dayjs(ts * 1000).format("MM/DD/YYYY");
+      const time = dayjs(ts * 1000).format("HH:mm a");
+      return (
+        <TimelineItem key={index}>
+          <TimelineOppositeContent color="textSecondary">
+            {time} {date}
+          </TimelineOppositeContent>
+          <TimelineSeparator>
+            <TimelineDot />
+            <TimelineConnector />
+          </TimelineSeparator>
+          <TimelineContent sx={{ py: "12px", px: 2 }}>
+            <Typography>Location: {item.location}</Typography>
+            <Typography>Actor: {item.actor}</Typography>
+          </TimelineContent>
+        </TimelineItem>
+      );
+    });
+  };
+
+  const handleBack = () => {
+    navigate(-2);
   };
 
   return (
@@ -98,7 +144,14 @@ const Product = () => {
       sx={{
         backgroundImage: `url(${bgImg})`,
         minHeight: "80vh",
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
         backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        zIndex: -2,
         overflowY: "scroll",
       }}
     >
@@ -107,6 +160,8 @@ const Product = () => {
         sx={{
           width: "400px",
           margin: "auto",
+          marginTop: "10%",
+          marginBottom: "10%",
           padding: "3%",
           backgroundColor: "#e3eefc",
         }}
@@ -121,6 +176,8 @@ const Product = () => {
           <Typography
             variant="h2"
             sx={{
+              textAlign: "center",
+              marginBottom: "3%",
               fontFamily: "Gambetta",
               fontWeight: "bold",
               fontSize: "2.5rem",
@@ -128,49 +185,135 @@ const Product = () => {
           >
             Product Details
           </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", marginTop: "5%" }}>
-            <Avatar
-              alt={name}
-              src={image.filepreview}
-              sx={{ width: 100, height: 100, marginBottom: "3%" }}
+
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "row",
+              justifyContent: "flex-start",
+              alignItems: "center",
+              width: "100%",
+              marginTop: "5%",
+              marginBottom: "5%",
+            }}
+          >
+            <Box
+              sx={{
+                marginRight: "1.5%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                width: "35%",
+              }}
             >
-              {name}
-            </Avatar>
-            <Box sx={{ marginLeft: "1.5%" }}>
-              <Typography variant="body1">{name}</Typography>
-              <Typography variant="body2">
+              <Avatar
+                alt={name}
+                src={image.filepreview}
+                sx={{
+                  width: 100,
+                  height: 100,
+                  marginBottom: "3%",
+                  backgroundColor: "#3f51b5",
+                }}
+              >
+                {name}
+              </Avatar>
+            </Box>
+            <Box
+              sx={{
+                marginLeft: "1.5%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                width: "65%",
+              }}
+            >
+              <Typography
+                variant="body1"
+                sx={{ textAlign: "left", marginBottom: "5%" }}
+              >
+                Name: {name}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ textAlign: "left", marginBottom: "3%" }}
+              >
                 Serial Number: {serialNumber}
               </Typography>
-              <Typography variant="body2">
+              <Typography
+                variant="body2"
+                sx={{ textAlign: "left", marginBottom: "3%" }}
+              >
                 Description: {description}
               </Typography>
-              <Typography variant="body2">Brand: {brand}</Typography>
+              <Typography
+                variant="body2"
+                sx={{ textAlign: "left", marginBottom: "3%" }}
+              >
+                Brand: {brand}
+              </Typography>
             </Box>
           </Box>
+
           <Timeline
             sx={{
               [`& .${timelineOppositeContentClasses.root}`]: { flex: 0.2 },
             }}
           >
-            {history.map((item, index) => (
-              <TimelineItem key={index}>
-                <TimelineOppositeContent color="textSecondary">
-                  {dayjs(item.timestamp * 1000).format("HH:mm a MM/DD/YYYY")}
-                </TimelineOppositeContent>
-                <TimelineSeparator>
-                  <TimelineDot />
-                  <TimelineConnector />
-                </TimelineSeparator>
-                <TimelineContent sx={{ py: "12px", px: 2 }}>
-                  <Typography>Location: {item.location}</Typography>
-                  <Typography>Actor: {item.actor}</Typography>
-                </TimelineContent>
-              </TimelineItem>
-            ))}
+            {getHistory()}
+            <TimelineItem>
+              <TimelineOppositeContent color="textSecondary">
+                {dayjs().format("HH:mm a")} {dayjs().format("MM/DD/YYYY")}
+              </TimelineOppositeContent>
+              <TimelineSeparator>
+                <TimelineDot />
+              </TimelineSeparator>
+              <TimelineContent sx={{ py: "12px", px: 2 }}>
+                <Typography>IsSold: {isSold.toString()}</Typography>
+              </TimelineContent>
+            </TimelineItem>
           </Timeline>
-          <Button onClick={() => navigate(-2)} sx={{ marginTop: "5%" }}>
-            Back
-          </Button>
+
+          {loading !== "" && (
+            <Typography
+              variant="body2"
+              sx={{ textAlign: "center", marginTop: "3%" }}
+            >
+              {loading}
+            </Typography>
+          )}
+
+          <Box
+            sx={{ width: "100%", display: "flex", justifyContent: "center" }}
+          >
+            {/* Conditionally show the Update Product button only if the last history record's is_sold is false */}
+            {history.length === 0 ||
+            history[history.length - 1].is_sold !== true ? (
+              <Button
+                variant="contained"
+                type="submit"
+                sx={{
+                  width: "50%",
+                  marginTop: "3%",
+                  backgroundColor: "#98b5d5",
+                  "&:hover": { backgroundColor: "#618dbd" },
+                }}
+                onClick={() =>
+                  navigate("/update-product-details", { state: { qrData } })
+                }
+              >
+                Update Product
+              </Button>
+            ) : null}
+          </Box>
+
+          <Box
+            sx={{ width: "100%", display: "flex", justifyContent: "center" }}
+          >
+            <Button onClick={handleBack} sx={{ marginTop: "5%" }}>
+              Back
+            </Button>
+          </Box>
         </Box>
       </Paper>
     </Box>

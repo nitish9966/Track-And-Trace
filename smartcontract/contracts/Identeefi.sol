@@ -23,8 +23,17 @@ contract Identeefi {
         uint historySize;
     }
 
-    mapping(string => Product) public products;
-    mapping(string => ProductHistory[]) public productHistories; // Store history separately
+    mapping(string => Product) private products;
+    mapping(string => ProductHistory[]) private productHistories; // Store history separately
+
+    event ProductRegistered(string serialNumber, string name, string brand);
+    event ProductHistoryUpdated(
+        string serialNumber,
+        string actor,
+        string location,
+        string timestamp,
+        bool isSold
+    );
 
     constructor() {
         owner = msg.sender;
@@ -42,7 +51,7 @@ contract Identeefi {
     ) public {
         require(
             bytes(products[_serialNumber].serialNumber).length == 0,
-            "Product already registered"
+            unicode"Product already registered!"
         );
 
         products[_serialNumber] = Product({
@@ -55,6 +64,8 @@ contract Identeefi {
         });
 
         addProductHistory(_serialNumber, _actor, _location, _timestamp, false);
+
+        emit ProductRegistered(_serialNumber, _name, _brand);
     }
 
     function addProductHistory(
@@ -66,7 +77,7 @@ contract Identeefi {
     ) public {
         require(
             bytes(products[_serialNumber].serialNumber).length != 0,
-            "Product does not exist"
+            "Product does not exist!"
         );
 
         uint historyId = products[_serialNumber].historySize + 1;
@@ -76,8 +87,16 @@ contract Identeefi {
 
         products[_serialNumber].historySize++;
 
-        console.log("Product History added: %s", _actor);
-        console.log("Product : %s", products[_serialNumber].name);
+        emit ProductHistoryUpdated(
+            _serialNumber,
+            _actor,
+            _location,
+            _timestamp,
+            _isSold
+        );
+
+        console.log(unicode"✅ Product History added by: %s", _actor);
+        console.log(unicode"🛒 Product: %s", products[_serialNumber].name);
     }
 
     function getProductDetails(
@@ -86,26 +105,28 @@ contract Identeefi {
         public
         view
         returns (
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            uint
+            string memory name,
+            string memory serialNumber,
+            string memory brand,
+            string memory description,
+            string memory image,
+            uint historySize
         )
     {
         require(
             bytes(products[_serialNumber].serialNumber).length != 0,
-            "Product does not exist"
+            unicode"❌ Product does not exist!"
         );
 
+        Product memory p = products[_serialNumber];
+
         return (
-            products[_serialNumber].serialNumber,
-            products[_serialNumber].name,
-            products[_serialNumber].brand,
-            products[_serialNumber].description,
-            products[_serialNumber].image,
-            products[_serialNumber].historySize
+            p.name,
+            p.serialNumber,
+            p.brand,
+            p.description,
+            p.image,
+            p.historySize
         );
     }
 
@@ -114,7 +135,7 @@ contract Identeefi {
     ) public view returns (ProductHistory[] memory) {
         require(
             bytes(products[_serialNumber].serialNumber).length != 0,
-            "Product does not exist"
+            unicode"❌ Product does not exist!"
         );
 
         return productHistories[_serialNumber];

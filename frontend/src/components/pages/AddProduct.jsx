@@ -1,6 +1,12 @@
-import { Box, Paper, Typography } from "@mui/material";
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  Avatar,
+} from "@mui/material";
 import bgImg from "../../img/bg.png";
-import { TextField, Button } from "@mui/material";
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import axios from "axios";
@@ -13,33 +19,22 @@ import Geocode from "react-geocode";
 
 const getEthereumObject = () => window.ethereum;
 
-/*
- * This function returns the first linked account found.
- * If there is no account linked, it will return null.
- */
 const findMetaMaskAccount = async () => {
   try {
     const ethereum = getEthereumObject();
-
-    /*
-     * First make sure we have access to the Ethereum object.
-     */
     if (!ethereum) {
       console.error("Make sure you have Metamask!");
       alert("Make sure you have Metamask!");
       return null;
     }
-
-    console.log("We have the Ethereum object", ethereum);
     const accounts = await ethereum.request({ method: "eth_accounts" });
-
     if (accounts.length !== 0) {
-      const account = accounts[0];
-      console.log("Found an authorized account:", account);
-      return account;
+      return accounts[0];
     } else {
-      console.error("No authorized account found");
-      return null;
+      const newAccounts = await ethereum.request({
+        method: "eth_requestAccounts",
+      });
+      return newAccounts.length > 0 ? newAccounts[0] : null;
     }
   } catch (error) {
     console.error(error);
@@ -48,85 +43,97 @@ const findMetaMaskAccount = async () => {
 };
 
 const AddProduct = () => {
+  // Product details state
   const [currentAccount, setCurrentAccount] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [description, setDescription] = useState("");
-  const [image, setImage] = useState({
-    file: [],
-    filepreview: null,
-  });
+  const [image, setImage] = useState({ file: [], filepreview: null });
   const [qrData, setQrData] = useState("");
+  const [loading, setLoading] = useState("");
+
+  // Manufacturer details (from profile/geolocation)
   const [manuDate, setManuDate] = useState("");
   const [manuLatitude, setManuLatitude] = useState("");
   const [manuLongtitude, setManuLongtitude] = useState("");
-  const [manuName, setManuName] = useState("");
-  const [loading, setLoading] = useState("");
+  const [manuName, setManuName] = useState(""); // actor to be stored in history
   const [manuLocation, setManuLocation] = useState("");
+
+  // For uniqueness check
   const [isUnique, setIsUnique] = useState(true);
 
+  // Blockchain contract details (if still needed)
   const CONTRACT_ADDRESS = "0x5BaAd2F8d16f2c32243aA12Dcb3bfE7D1ea67504";
   const contractABI = abi.abi;
 
   const { auth } = useAuth();
   const navigate = useNavigate();
 
+  // On mount, get user info and geolocation
   useEffect(() => {
-    findMetaMaskAccount().then((account) => {
-      if (account !== null) {
-        setCurrentAccount(account);
+    const getUsername = async () => {
+      if (!auth?.user) {
+        console.warn("⚠️ No user found in auth. Skipping API call.");
+        return;
       }
-    });
-    getUsername();
-    getCurrentTimeLocation();
-  }, []);
-
-  useEffect(() => {
-    Geocode.setApiKey("AIzaSyB5MSbxR9Vuj1pPeGvexGvQ3wUel4znfYY");
-
-    Geocode.fromLatLng(manuLatitude, manuLongtitude).then(
-      (response) => {
-        const address = response.results[0].formatted_address;
-        let city, state, country;
-        for (
-          let i = 0;
-          i < response.results[0].address_components.length;
-          i++
-        ) {
-          for (
-            let j = 0;
-            j < response.results[0].address_components[i].types.length;
-            j++
-          ) {
-            switch (response.results[0].address_components[i].types[j]) {
-              case "locality":
-                city = response.results[0].address_components[i].long_name;
-                break;
-              case "administrative_area_level_1":
-                state = response.results[0].address_components[i].long_name;
-                break;
-              case "country":
-                country = response.results[0].address_components[i].long_name;
-                break;
-            }
-          }
+      try {
+        console.log(`🔍 Fetching username for: ${auth.user}`);
+        const res = await axios.get(
+          `http://localhost:5000/profile/${auth.user}`
+        );
+        if (res.data && res.data[0] && res.data[0].name) {
+          setManuName(res.data[0].name);
+        } else {
+          // Fallback: use auth.user if the API doesn't return a name
+          setManuName(auth.user);
         }
-        setManuLocation(address.replace(/,/g, ";"));
-        console.log("city, state, country: ", city, state, country);
-        console.log("address:", address);
-      },
-      (error) => {
-        console.error(error);
+      } catch (error) {
+        console.error(
+          "❌ Error fetching username:",
+          error.response?.data || error.message
+        );
+        // Fallback to auth.user
+        setManuName(auth.user);
       }
-    );
+    };
+
+    const fetchData = async () => {
+      try {
+        const account = await findMetaMaskAccount();
+        if (account) setCurrentAccount(account);
+        await getUsername();
+        getCurrentTimeLocation();
+      } catch (error) {
+        console.error("❌ Error in fetchData:", error);
+      }
+    };
+
+    fetchData();
+  }, [auth?.user]);
+
+  // Geocode to get manufacturer location details
+  useEffect(() => {
+    Geocode.setApiKey("YOUR_GOOGLE_API_KEY_HERE");
+    if (manuLatitude && manuLongtitude) {
+      Geocode.fromLatLng(manuLatitude, manuLongtitude).then(
+        (response) => {
+          const address = response.results[0].formatted_address;
+          setManuLocation(address.replace(/,/g, ";"));
+          console.log("Address:", address);
+        },
+        (error) => {
+          console.error(error);
+        }
+      );
+    }
   }, [manuLatitude, manuLongtitude]);
 
+  // Generate QR Code data (if needed)
   const generateQRCode = async (serialNumber) => {
-    // const qrCode = await productContract.getProduct(serialNumber);
     const data = CONTRACT_ADDRESS + "," + serialNumber;
     setQrData(data);
-    console.log("QR Code: ", qrData);
+    console.log("QR Code: ", data);
   };
 
   const downloadQR = () => {
@@ -154,39 +161,75 @@ const AddProduct = () => {
     });
   };
 
-  const getUsername = async (e) => {
-    const res = await axios
-      .get(`http://localhost:5000/profile/${auth.user}`)
-      .then((res) => {
-        console.log(JSON.stringify(res?.data[0]));
-        setManuName(res?.data[0].name);
-      });
-  };
-
-  // to upload image
+  // Upload product image to backend
   const uploadImage = async (image) => {
     const data = new FormData();
     data.append("image", image.file);
-
-    axios
-      .post("http://localhost:5000/upload/product", data, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
-      .then((res) => {
-        console.log(res);
-
-        if (res.data.success === 1) {
-          console.log("image uploaded");
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/upload/product",
+        data,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
         }
-      });
+      );
+      console.log("Image upload response:", res.data);
+    } catch (err) {
+      console.error("Image upload error:", err);
+    }
   };
 
-  const registerProduct = async (e) => {
-    e.preventDefault();
+  // Add product to the product table in DB
+  const addProductDB = async () => {
+    try {
+      const productData = JSON.stringify({
+        serialNumber: serialNumber,
+        name: name,
+        brand: brand,
+        description: description,
+        image: image.file.name,
+      });
+      const res = await axios.post(
+        "http://localhost:5000/addproduct",
+        productData,
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      console.log("Product DB response:", res.data);
+    } catch (err) {
+      console.error("Error adding product to DB:", err);
+    }
+  };
 
+  // Add product history to the product_history table in DB
+  const addProductHistoryDB = async () => {
+    try {
+      const productHistoryData = JSON.stringify({
+        serialNumber: serialNumber,
+        actor: manuName, // now using manuName (either from API or fallback to auth.user)
+        location: manuLocation,
+        timestamp: manuDate,
+        is_sold: false,
+      });
+      console.log("Adding product history with:", productHistoryData);
+      const res = await axios.post(
+        "http://localhost:5000/addproduct_history",
+        productHistoryData,
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      console.log("Product history added:", res.data);
+    } catch (err) {
+      console.error("Error adding product history:", err);
+    }
+  };
+
+  // (Optional) Blockchain registration – if still desired
+  const registerProduct = async (e) => {
     try {
       const { ethereum } = window;
-
       if (ethereum) {
         const provider = new ethers.providers.Web3Provider(ethereum);
         const signer = provider.getSigner();
@@ -195,10 +238,6 @@ const AddProduct = () => {
           contractABI,
           signer
         );
-
-        console.log("here");
-
-        // write transactions
         const registerTxn = await productContract.registerProduct(
           name,
           brand,
@@ -210,23 +249,16 @@ const AddProduct = () => {
           manuDate.toString()
         );
         console.log("Mining (Registering Product) ...", registerTxn.hash);
-        setLoading("Mining (Register Product) ...", registerTxn.hash);
-
+        setLoading("Mining (Register Product) ... " + registerTxn.hash);
         await registerTxn.wait();
         console.log("Mined (Register Product) --", registerTxn.hash);
-        setLoading("Mined (Register Product) --", registerTxn.hash);
-
+        setLoading("Mined (Register Product) -- " + registerTxn.hash);
         generateQRCode(serialNumber);
-
-        const product = await productContract.getProduct(serialNumber);
-
-        console.log("Retrieved product...", product);
-        setLoading("");
       } else {
         console.log("Ethereum object doesn't exist!");
       }
     } catch (error) {
-      console.log(error);
+      console.log("Error in blockchain registration:", error);
     }
   };
 
@@ -238,70 +270,50 @@ const AddProduct = () => {
     });
   };
 
-  const addProductDB = async (e) => {
+  // Check if serial number is unique (from DB)
+  const checkUnique = async () => {
     try {
-      const profileData = JSON.stringify({
-        serialNumber: serialNumber,
-        name: name,
-        brand: brand,
-      });
-
-      const res = await axios.post(
-        "http://localhost:5000/addproduct",
-        profileData,
-        {
-          headers: { "Content-Type": "application/json" },
-        }
+      const res = await axios.get("http://localhost:5000/product/serialNumber");
+      const existingSerialNumbers = res.data.map(
+        (product) => product.serialnumber
       );
-
-      console.log(JSON.stringify(res.data));
-    } catch (err) {
-      console.log(err);
+      const isDuplicate = existingSerialNumbers.includes(serialNumber);
+      setIsUnique(!isDuplicate);
+      console.log("Existing serials:", existingSerialNumbers);
+      console.log("isUnique: ", !isDuplicate);
+    } catch (error) {
+      console.error("Error checking uniqueness:", error);
     }
   };
 
-  const checkUnique = async () => {
-    const res = await axios.get("http://localhost:5000/product/serialNumber");
-
-    const existingSerialNumbers = res.data.map(
-      (product) => product.serialnumber
-    );
-    existingSerialNumbers.push(serialNumber);
-
-    // checking for duplicated serial number
-    const duplicates = existingSerialNumbers.filter(
-      (item, index) => existingSerialNumbers.indexOf(item) != index
-    );
-    console.log("duplicates: ", duplicates);
-    const isDuplicate = duplicates.length >= 1;
-
-    setIsUnique(!isDuplicate);
-    console.log(existingSerialNumbers);
-    console.log("isUnique: ", isUnique);
-  };
-
+  // Handle form submission: upload image, add product to DB, add product history, then (optionally) register on blockchain.
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log("..............................");
-    console.log("name: ", name);
-    console.log("brand: ", brand);
-    console.log("description: ", description);
-    console.log("image: ", image.file.name);
-    console.log("serialNumber: ", serialNumber);
-    console.log("manufacture date: ", manuDate);
-    console.log("manufactured at: ", manuLocation);
-    console.log("manufactured by: ", manuName);
+    console.log("Submitting product:");
+    console.log("Name:", name);
+    console.log("Brand:", brand);
+    console.log("Description:", description);
+    console.log("Image:", image.file.name);
+    console.log("Serial Number:", serialNumber);
+    console.log("Manufacture date:", manuDate);
+    console.log("Manufactured at:", manuLocation);
+    console.log("Manufactured by:", manuName);
 
-    checkUnique();
+    await checkUnique();
 
     if (isUnique) {
-      uploadImage(image);
-      addProductDB(e); // add product to database
+      await uploadImage(image);
+      await addProductDB(); // Add to product table
+      await addProductHistoryDB(); // Add to product_history table
       setLoading(
         "Please pay the transaction fee to update the product details..."
       );
-      await registerProduct(e);
+      await registerProduct(e); // (Optional blockchain registration)
+    } else {
+      setLoading(
+        "Serial Number already exists. Please use a unique serial number."
+      );
     }
 
     setIsUnique(true);
@@ -319,7 +331,6 @@ const AddProduct = () => {
         top: 0,
         bottom: 0,
         backgroundSize: "cover",
-        backgroundRepeat: "no-repeat",
         zIndex: -2,
         overflowY: "scroll",
       }}
@@ -352,50 +363,38 @@ const AddProduct = () => {
             fullWidth
             error={!isUnique}
             helperText={!isUnique ? "Serial Number already exists" : ""}
-            id="outlined-basic"
             margin="normal"
             label="Serial Number"
             variant="outlined"
-            inherit="False"
             onChange={(e) => setSerialNumber(e.target.value)}
             value={serialNumber}
           />
-
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Name"
             variant="outlined"
-            inherit="False"
             onChange={(e) => setName(e.target.value)}
             value={name}
           />
-
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Brand"
             variant="outlined"
-            inherit="False"
             onChange={(e) => setBrand(e.target.value)}
             value={brand}
           />
-
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Description"
             variant="outlined"
-            inherit="False"
             multiline
             minRows={2}
             onChange={(e) => setDescription(e.target.value)}
             value={description}
           />
-
           <Button
             variant="outlined"
             component="label"
@@ -405,16 +404,14 @@ const AddProduct = () => {
             Upload Image
             <input type="file" hidden onChange={handleImage} />
           </Button>
-
-          {image.filepreview !== null ? (
+          {image.filepreview && (
             <img
               src={image.filepreview}
               alt="preview"
               style={{ width: "100%", height: "100%" }}
             />
-          ) : null}
-
-          {qrData !== "" ? (
+          )}
+          {qrData !== "" && (
             <div
               style={{
                 display: "flex",
@@ -425,9 +422,8 @@ const AddProduct = () => {
             >
               <QRCode value={qrData} id="QRCode" />
             </div>
-          ) : null}
-
-          {qrData !== "" ? (
+          )}
+          {qrData !== "" && (
             <div
               style={{
                 display: "flex",
@@ -438,33 +434,27 @@ const AddProduct = () => {
             >
               <Button
                 variant="outlined"
-                component="label"
                 fullWidth
                 sx={{ marginTop: "3%", marginBottom: "3%" }}
                 onClick={downloadQR}
               >
-                Download
+                Download QR Code
               </Button>
             </div>
-          ) : null}
-
-          {loading === "" ? null : (
+          )}
+          {loading && (
             <Typography
               variant="body2"
-              sx={{
-                textAlign: "center",
-                marginTop: "3%",
-              }}
+              sx={{ textAlign: "center", marginTop: "3%" }}
             >
               {loading}
             </Typography>
           )}
-
           <Button
             variant="contained"
             type="submit"
+            fullWidth
             sx={{
-              width: "100%",
               marginTop: "3%",
               backgroundColor: "#98b5d5",
               "&:hover": { backgroundColor: "#618dbd" },
@@ -473,20 +463,10 @@ const AddProduct = () => {
           >
             Add Product
           </Button>
-
           <Box
-            sx={{
-              width: "100%",
-              display: "flex",
-              justifyContent: "center",
-            }}
+            sx={{ width: "100%", display: "flex", justifyContent: "center" }}
           >
-            <Button
-              onClick={handleBack}
-              sx={{
-                marginTop: "5%",
-              }}
-            >
+            <Button onClick={handleBack} sx={{ marginTop: "5%" }}>
               Back
             </Button>
           </Box>

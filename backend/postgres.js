@@ -21,7 +21,10 @@ const client = new Client({
 
 client.connect();
 
-// ✅ Improved error handling in database functions
+// ------------------------------
+// Database helper functions
+// ------------------------------
+
 async function createAccount(username, password, role) {
     try {
         await client.query('INSERT INTO auth (username, password, role) VALUES ($1, $2, $3)', [username, password, role]);
@@ -52,7 +55,6 @@ async function createProfile(username, name, description, website, location, ima
     }
 }
 
-// ✅ Handle case sensitivity issue with "serialNumber"
 async function addProduct(serialNumber, name, brand) {
     try {
         await client.query('INSERT INTO product ("serialNumber", name, brand) VALUES ($1, $2, $3)', [serialNumber, name, brand]);
@@ -62,7 +64,10 @@ async function addProduct(serialNumber, name, brand) {
     }
 }
 
-// ✅ File upload configurations
+// ------------------------------
+// Multer configurations for file uploads
+// ------------------------------
+
 const storageProduct = multer.diskStorage({
     destination: path.join(__dirname, 'public/uploads/product'),
     filename: (req, file, cb) => {
@@ -77,7 +82,9 @@ const storageProfile = multer.diskStorage({
     }
 });
 
-// ✅ API Routes
+// ------------------------------
+// API Routes
+// ------------------------------
 
 // Auth Routes
 app.get('/authAll', async (req, res) => {
@@ -141,6 +148,31 @@ app.post('/addprofile', async (req, res) => {
     res.send('Profile created');
 });
 
+app.put('/updateprofile', async (req, res) => {
+    const { username, name, description, website, location, image, role } = req.body;
+    try {
+        await client.query(
+            'UPDATE profile SET name = $1, description = $2, website = $3, location = $4, image = $5, role = $6 WHERE username = $7',
+            [name, description, website, location, image, role, username]
+        );
+        res.send('Profile updated');
+    } catch (error) {
+        console.error("Error updating profile:", error.message);
+        res.status(500).send("Server error");
+    }
+});
+
+app.delete('/deleteprofile/:username', async (req, res) => {
+    const { username } = req.params;
+    try {
+        await client.query('DELETE FROM profile WHERE username = $1', [username]);
+        res.send('Profile deleted');
+    } catch (error) {
+        console.error("Error deleting profile:", error.message);
+        res.status(500).send("Server error");
+    }
+});
+
 // Image Upload Routes
 app.post('/upload/profile', (req, res) => {
     let upload = multer({ storage: storageProfile }).single('image');
@@ -171,23 +203,116 @@ app.get('/file/product/:fileName', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/uploads/product', fileName));
 });
 
-// ✅ Fixed "serialNumber" column case sensitivity
-app.get('/product/serialNumber', async (req, res) => {
+// Product Routes
+
+// Returns all product serial numbers
+// app.get('/product/serialNumber', async (req, res) => {
+//     try {
+//         const data = await client.query('SELECT "serialnumber" FROM product');
+//         res.send(data.rows);
+//     } catch (error) {
+//         console.error("Error fetching serial numbers:", error.message);
+//         res.status(500).send("Server error");
+//     }
+// });
+
+// Add a new product
+app.post('/addproduct', async (req, res) => {
+    const { serialNumber, name, brand, description, image } = req.body;
+    await addProduct(serialNumber, name, brand, description, image);
+    res.send('Product added');
+});
+
+// ------------------------------
+// NEW: Get a specific product by serial number
+app.get('/product/:serialNumber', async (req, res) => {
+    const { serialNumber } = req.params;
     try {
-        const data = await client.query('SELECT "serialnumber" FROM product');
-        res.send(data.rows);
+        const data = await client.query('SELECT * FROM product WHERE "serialNumber" = $1', [serialNumber]);
+        if (data.rows.length === 0) {
+            res.status(404).send('Product not found');
+        } else {
+            res.send(data.rows[0]);
+        }
     } catch (error) {
-        console.error("Error fetching serial numbers:", error.message);
+        console.error("Error fetching product:", error.message);
         res.status(500).send("Server error");
     }
 });
 
-app.post('/addproduct', async (req, res) => {
-    const { serialNumber, name, brand } = req.body;
-    await addProduct(serialNumber, name, brand);
-    res.send('Product added');
+// Endpoint to add a new product history record
+app.post('/addproduct_history', async (req, res) => {
+    // Expected JSON payload:
+    // {
+    //   "serialNumber": "PRODUCT_SERIAL",
+    //   "actor": "User or Manufacturer Name",
+    //   "location": "Location string",
+    //   "timestamp": 1660000000,  // Unix timestamp
+    //   "is_sold": false
+    // }
+    const { serialNumber, actor, location, timestamp, is_sold } = req.body;
+    
+    try {
+      // Insert the history record.
+      // Here, we assume the "product_id" in product_history is the same as the product's serial number.
+      // Adjust the query if your schema uses a different reference.
+      await client.query(
+        'INSERT INTO product_history (product_id, actor, location, timestamp, is_sold) VALUES ($1, $2, $3, $4, $5)',
+        [serialNumber, actor, location, timestamp, is_sold]
+      );
+      
+      res.send('Product history added successfully');
+    } catch (error) {
+      console.error("Error adding product history:", error.message);
+      res.status(500).send("Server error");
+    }
+  });
+
+  app.get('/product_history/:serialNumber', async (req, res) => {
+    const { serialNumber } = req.params;
+    try {
+      // Query the product_history table using the product's serial number.
+      // Adjust the column name if necessary.
+      const data = await client.query(
+        'SELECT * FROM product_history WHERE product_id = $1',
+        [serialNumber]
+      );
+      res.send(data.rows);
+    } catch (error) {
+      console.error("Error fetching product history:", error.message);
+      res.status(500).send("Server error");
+    }
+  });
+
+  const getUsername = async () => {
+    if (!auth?.user) return;
+    try {
+      const res = await axios.get(`http://localhost:5000/profile/${auth.user}`);
+      if (res.data && res.data[0] && res.data[0].name) {
+        setManuName(res.data[0].name);
+      } else {
+        setManuName(auth.user);
+      }
+    } catch (error) {
+      console.error("Error fetching username:", error);
+      setManuName(auth.user);
+    }
+  };  
+  
+
+// Delete a specific product
+app.delete('/deleteproduct/:serialNumber', async (req, res) => {
+    const { serialNumber } = req.params;
+    try {
+        await client.query('DELETE FROM product WHERE "serialNumber" = $1', [serialNumber]);
+        res.send('Product deleted');
+    } catch (error) {
+        console.error("Error deleting product:", error.message);
+        res.status(500).send("Server error");
+    }
 });
 
+// Start Server
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
