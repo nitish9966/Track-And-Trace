@@ -1,5 +1,5 @@
 import { Box, Paper, Avatar, Typography, Button } from "@mui/material";
-import bgImg from "../../img/bg.png";
+import bgImg from "../../img/back.png";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import useAuth from "../../hooks/useAuth";

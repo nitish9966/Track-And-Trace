@@ -78,7 +78,14 @@ const Guide = () => {
             marginBottom: "2rem",
           }}
         >
-          Our fake product identification system using blockchain technology assigns a unique digital ID to each product that is recorded on the blockchain. Consumers can scan the product's QR code or enter its digital ID on our website to verify its authenticity and ensure it has not been tampered with or counterfeited. By leveraging the security and transparency of the blockchain, our system provides a reliable and efficient way to combat product counterfeiting and protect consumers' safety and trust.
+          Our fake product identification system using blockchain technology
+          assigns a unique digital ID to each product that is recorded on the
+          blockchain. Consumers can scan the product's QR code or enter its
+          digital ID on our website to verify its authenticity and ensure it has
+          not been tampered with or counterfeited. By leveraging the security
+          and transparency of the blockchain, our system provides a reliable and
+          efficient way to combat product counterfeiting and protect consumers'
+          safety and trust.
         </Typography>
       </CustomBox>
 
@@ -178,7 +185,7 @@ const Guide = () => {
       </GuidesBox> */}
 
       <CustomButton
-        backgroundColor="#0F1B4C"
+        backgroundColor="#A84600"
         color="#fff"
         buttonText="See Full Guides"
         guideBtn={true}

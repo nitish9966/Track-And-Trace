@@ -1,5 +1,5 @@
 import { Box, Paper, Typography } from "@mui/material";
-import bgImg from "../../img/bg.png";
+import bgImg from "../../img/back.png";
 import axios from "axios";
 import { DataGrid } from "@mui/x-data-grid";
 import { Button } from "@mui/material";

@@ -7,7 +7,7 @@ import MiscellaneousServicesIcon from "@mui/icons-material/MiscellaneousServices
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import HomeIcon from "@mui/icons-material/Home";
 import ContactsIcon from "@mui/icons-material/Contacts";
-import logoImg from "../../img/logo.png";
+import logoImg from "../../img/TrackAndTrace1.png";
 import { Container } from "@mui/system";
 import CustomButton from "./CustomButton";
 import {
@@ -108,6 +108,8 @@ export const Navbar = () => {
 
   const NavbarLogo = styled("img")(({ theme }) => ({
     cursor: "pointer",
+    width: "120px", // Adjust the width
+    height: "auto", // Maintain aspect ratio
     [theme.breakpoints.down("md")]: {
       display: "none",
     },
@@ -132,7 +134,7 @@ export const Navbar = () => {
           >
             {list("left")}
           </Drawer>
-          <NavbarLogo src={logoImg} alt="Identeefi." />
+          <NavbarLogo src={logoImg} alt="Track And Trace." />
         </Box>
 
         {/* <NavbarLinksBox>
@@ -153,16 +155,14 @@ export const Navbar = () => {
         }}
       >
         {/* <NavLink variant="body2">Sign Up</NavLink> */}
-        <Link to="/login" style={{ textDecoration: 'none'}}>
+        <Link to="/login" style={{ textDecoration: "none" }}>
           <CustomButton
-            backgroundColor="#0F1B4C"
+            backgroundColor="#A84600"
             color="#fff"
             buttonText="Login"
             NavLink="/login"
-
           />
         </Link>
-        
       </Box>
     </NavbarContainer>
   );

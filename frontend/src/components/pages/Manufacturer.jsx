@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Box, Button as Btn } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
+import BgImg from "../../img/manu.jpg";
 
 const getEthereumObject = () => window.ethereum;
 
@@ -67,8 +68,17 @@ const Manufacturer = () => {
   };
 
   return (
-    <div className="role-container">
-      <div className="role-container-box">
+    <div
+      className="role-container"
+      style={{
+        background: `url(${BgImg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        objectFit: "cover",
+      }}
+    >
+      <div className="role-container-box" style={{ background: "#D4AF37" }}>
         <Box
           sx={{
             position: "absolute",
@@ -76,13 +86,13 @@ const Manufacturer = () => {
             right: 20,
           }}
         >
-          <Btn href="/login" endIcon={<LogoutIcon />}>
+          <Btn href="/login" endIcon={<LogoutIcon />} sx={{ color: "black" }}>
             Logout
           </Btn>
         </Box>
 
-        <h2>Welcome:</h2>
-        <h1>Manufacturer</h1>
+        <h2 style={{ color: "black" }}>Welcome:</h2>
+        <h1 style={{ color: "black" }}>Manufacturer</h1>
 
         <Link to="/profile">
           <Button

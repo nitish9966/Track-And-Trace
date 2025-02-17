@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import React from "react";
 import { useRef, useState, useEffect } from "react";
-import bgImg from "../../img/bg.png";
+import bgImg from "../../img/back.png";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 

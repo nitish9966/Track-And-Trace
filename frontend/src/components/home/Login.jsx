@@ -5,11 +5,12 @@ import Checkbox from "@mui/material/Checkbox";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Container from "@mui/material/Container";
-import bgImg from "../../img/bg.png";
+import bgImg from "../../img/login.jpg";
 import axios from "../../api/axios";
 import useAuth from "../../hooks/useAuth";
 import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { color } from "@mui/system";
 
 const LOGIN_URL = "/auth";
 
@@ -72,15 +73,12 @@ export default function Login() {
     <Box
       sx={{
         backgroundImage: `url(${bgImg})`,
-        minHeight: "80vh",
         backgroundRepeat: "no-repeat",
         position: "absolute",
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
+        width: "100%",
+        height: "100%",
         backgroundSize: "cover",
-        backgroundRepeat: "no-repeat",
+        objectFit: "cover",
         zIndex: -2,
       }}
     >
@@ -92,11 +90,12 @@ export default function Login() {
             px: 4,
             py: 6,
             marginTop: 8,
-            backgroundColor: "#e3eefc",
+            // backgroundColor: "#e3eefc",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             align: "center",
+            backgroundColor: "rgba(255, 255, 255, 0.8)",
           }}
         >
           <Typography
@@ -111,7 +110,7 @@ export default function Login() {
               fontSize: "2.5rem",
             }}
           >
-            IDENTEEFI
+            Trace And Trace
           </Typography>
           <Typography component="h1" variant="h5">
             Login
@@ -162,7 +161,7 @@ export default function Login() {
               type="submit"
               fullWidth
               variant="contained"
-              sx={{ mt: 3, mb: 2 }}
+              sx={{ mt: 3, mb: 2, backgroundColor: "#A84600", color: "#fff" }}
             >
               Login
             </Button>
@@ -173,7 +172,9 @@ export default function Login() {
                 justifyContent: "center",
               }}
             >
-              <Button onClick={handleBack}>Back</Button>
+              <Button onClick={handleBack} sx={{ color: "#A84600" }}>
+                Back
+              </Button>
             </Box>
           </Box>
         </Box>

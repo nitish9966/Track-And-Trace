@@ -1,6 +1,6 @@
 import { Box, Container, styled, Typography } from "@mui/material";
 import React from "react";
-import logoImg from "../../img/logo.png";
+import logoImg from "../../img/TrackAndTrace.png";
 import starsImg from "../../img/Star.png";
 import logosImg from "../../img/logos.png";
 
@@ -26,7 +26,11 @@ const Companies = () => {
     <Box sx={{ mt: 10 }}>
       <CustomContainer>
         <CustomBox>
-          <img src={logoImg} alt="logo" style={{ maxWidth: "100%" }} />
+          <img
+            src={logoImg}
+            alt="logo"
+            style={{ maxWidth: "50%", height: "40%" }}
+          />
           <Typography
             variant="body2"
             sx={{
@@ -36,11 +40,11 @@ const Companies = () => {
               mt: 2,
             }}
           >
-            More than 45,000 trust Identeefi
+            Security is our first priority
           </Typography>
         </CustomBox>
 
-        <Box>
+        <Box sx={{ textAlign: "center", mt: 5 }}>
           <img src={starsImg} alt="stars" style={{ maxWidth: "100%" }} />
           <Typography
             variant="body2"

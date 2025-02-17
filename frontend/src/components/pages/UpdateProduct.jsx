@@ -1,5 +1,5 @@
 import { Box, Paper, Avatar, Typography, Button } from "@mui/material";
-import bgImg from "../../img/bg.png";
+import bgImg from "../../img/back.png";
 import Timeline from "@mui/lab/Timeline";
 import TimelineItem from "@mui/lab/TimelineItem";
 import TimelineSeparator from "@mui/lab/TimelineSeparator";
@@ -240,12 +240,12 @@ const UpdateProduct = () => {
               >
                 Serial Number: {serialNumber}
               </Typography>
-              <Typography
+              {/* <Typography
                 variant="body2"
                 sx={{ textAlign: "left", marginBottom: "3%" }}
               >
                 Description: {description}
-              </Typography>
+              </Typography> */}
               <Typography
                 variant="body2"
                 sx={{ textAlign: "left", marginBottom: "3%" }}

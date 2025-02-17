@@ -1,5 +1,5 @@
 import { Box, Paper, Typography, Button } from "@mui/material";
-import bgImg from "../../img/bg.png";
+import bgImg from "../../img/scanner.jpg";
 import QrScanner from "../QrScanner";
 import { useEffect, useState } from "react";
 import useAuth from "../../hooks/useAuth";
@@ -69,7 +69,7 @@ const ScannerPage = () => {
           marginTop: "10%",
           marginBottom: "10%",
           padding: "3%",
-          backgroundColor: "#e3eefc",
+          backgroundColor: "#ABEBC6",
         }}
       >
         <Box sx={{ textAlign: "center", marginBottom: "5%" }}>
@@ -81,6 +81,7 @@ const ScannerPage = () => {
               fontFamily: "Gambetta",
               fontWeight: "bold",
               fontSize: "2.5rem",
+              color: "black",
             }}
           >
             Scan QR Code
@@ -92,7 +93,10 @@ const ScannerPage = () => {
           <Box
             sx={{ width: "100%", display: "flex", justifyContent: "center" }}
           >
-            <Button onClick={handleBack} sx={{ marginTop: "5%" }}>
+            <Button
+              onClick={handleBack}
+              sx={{ marginTop: "5%", fontWeight: "bold" }}
+            >
               Back
             </Button>
           </Box>

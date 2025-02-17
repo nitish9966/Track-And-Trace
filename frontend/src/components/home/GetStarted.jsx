@@ -1,12 +1,12 @@
 import { Button, styled, Typography } from "@mui/material";
 import { Box, Container } from "@mui/system";
 import React from "react";
-import homeIllustration from "../../img/illustration.png";
+import homeIllustration from "../../img/exchange.webp";
 import CustomButton from "./CustomButton";
 
 const GetStarted = () => {
   const CustomContainer = styled(Container)(({ theme }) => ({
-    backgroundColor: "#17275F",
+    backgroundColor: "#D35400",
     height: "416px",
     borderRadius: "15px",
     display: "flex",
@@ -46,7 +46,7 @@ const GetStarted = () => {
 
           <CustomButton
             backgroundColor="#fff"
-            color="#17275F"
+            color="#A84600"
             buttonText="Get Started Now"
             getStartedBtn={true}
           />
@@ -55,7 +55,7 @@ const GetStarted = () => {
         <img
           src={homeIllustration}
           alt="illustration"
-          style={{ maxWidth: "100%" }}
+          style={{ maxWidth: "50%" }}
         />
       </CustomContainer>
     </CustomBox>
