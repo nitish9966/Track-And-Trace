@@ -9,6 +9,7 @@ contract Identeefi {
     struct ProductHistory {
         uint id;
         string actor;
+        string role; // Added role field
         string location;
         string timestamp;
         bool isSold;
@@ -24,12 +25,13 @@ contract Identeefi {
     }
 
     mapping(string => Product) private products;
-    mapping(string => ProductHistory[]) private productHistories; // Store history separately
+    mapping(string => ProductHistory[]) private productHistories;
 
     event ProductRegistered(string serialNumber, string name, string brand);
     event ProductHistoryUpdated(
         string serialNumber,
         string actor,
+        string role, // Added role to event
         string location,
         string timestamp,
         bool isSold
@@ -63,7 +65,16 @@ contract Identeefi {
             historySize: 0
         });
 
-        addProductHistory(_serialNumber, _actor, _location, _timestamp, false);
+        // Add initial history with a default "manufacturer" role
+        // You can modify this to accept a role parameter if needed
+        addProductHistory(
+            _serialNumber,
+            _actor,
+            "manufacturer",
+            _location,
+            _timestamp,
+            false
+        );
 
         emit ProductRegistered(_serialNumber, _name, _brand);
     }
@@ -71,6 +82,7 @@ contract Identeefi {
     function addProductHistory(
         string memory _serialNumber,
         string memory _actor,
+        string memory _role, // Added role parameter
         string memory _location,
         string memory _timestamp,
         bool _isSold
@@ -82,7 +94,14 @@ contract Identeefi {
 
         uint historyId = products[_serialNumber].historySize + 1;
         productHistories[_serialNumber].push(
-            ProductHistory(historyId, _actor, _location, _timestamp, _isSold)
+            ProductHistory(
+                historyId,
+                _actor,
+                _role,
+                _location,
+                _timestamp,
+                _isSold
+            )
         );
 
         products[_serialNumber].historySize++;
@@ -90,12 +109,17 @@ contract Identeefi {
         emit ProductHistoryUpdated(
             _serialNumber,
             _actor,
+            _role,
             _location,
             _timestamp,
             _isSold
         );
 
-        console.log(unicode"✅ Product History added by: %s", _actor);
+        console.log(
+            unicode"✅ Product History added by: %s (Role: %s)",
+            _actor,
+            _role
+        );
         console.log(unicode"🛒 Product: %s", products[_serialNumber].name);
     }
 

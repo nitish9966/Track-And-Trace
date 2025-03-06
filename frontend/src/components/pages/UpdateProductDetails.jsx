@@ -23,7 +23,6 @@ import axios from "axios";
 import abi from "../../utils/Identeefi.json";
 import useAuth from "../../hooks/useAuth";
 import { ethers } from "ethers";
-import Geocode from "react-geocode";
 
 const options = ["true", "false"];
 
@@ -56,7 +55,7 @@ const UpdateProductDetails = () => {
   const [currLatitude, setCurrLatitude] = useState("");
   const [currLongtitude, setCurrLongtitude] = useState("");
   const [currName, setCurrName] = useState("");
-  const [currLocation, setCurrLocation] = useState("");
+  const [currLocation, setCurrLocation] = useState("Fetching location...");
   const [serialNumber, setSerialNumber] = useState("");
   const [isSold, setIsSold] = useState(false);
   const [loading, setLoading] = useState("");
@@ -89,29 +88,53 @@ const UpdateProductDetails = () => {
     getCurrentTimeLocation();
   }, []);
 
-  // Get manufacturer location details using Geocode.
-  useEffect(() => {
-    Geocode.setApiKey("YOUR_GOOGLE_API_KEY_HERE");
-    if (currLatitude && currLongtitude) {
-      Geocode.fromLatLng(currLatitude, currLongtitude).then(
-        (response) => {
-          const address = response.results[0].formatted_address;
-          setCurrLocation(address.replace(/,/g, ";"));
-          console.log("Address:", address);
-        },
-        (error) => {
-          console.error(error);
-        }
+  // Updated location code using Nominatim
+  const fetchLocation = async (lat, lon) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
+        {
+          headers: {
+            "User-Agent": "TestReactApp/1.0 (test@example.com)",
+          },
+        } // Replace with your email
       );
+      const data = await response.json();
+      setCurrLocation(
+        data.display_name
+          ? data.display_name.replace(/,/g, ";")
+          : "Location not found"
+      );
+    } catch (error) {
+      setCurrLocation("Failed to fetch location");
+      console.error("Error fetching location:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (currLatitude && currLongtitude) {
+      fetchLocation(currLatitude, currLongtitude);
     }
   }, [currLatitude, currLongtitude]);
 
   const getCurrentTimeLocation = () => {
     setCurrDate(dayjs().unix());
-    navigator.geolocation.getCurrentPosition(function (position) {
-      setCurrLatitude(position.coords.latitude);
-      setCurrLongtitude(position.coords.longitude);
-    });
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrLatitude(position.coords.latitude);
+          setCurrLongtitude(position.coords.longitude);
+        },
+        (error) => {
+          setCurrLocation("Geolocation denied");
+          console.error("Geolocation error:", error);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      setCurrLocation("Geolocation not supported");
+      console.error("Geolocation not supported by browser");
+    }
   };
 
   const getUsername = async () => {

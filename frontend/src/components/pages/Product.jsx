@@ -240,12 +240,12 @@ const Product = () => {
               >
                 Serial Number: {serialNumber}
               </Typography>
-              <Typography
+              {/* <Typography
                 variant="body2"
                 sx={{ textAlign: "left", marginBottom: "3%" }}
               >
                 Description: {description}
-              </Typography>
+              </Typography> */}
               <Typography
                 variant="body2"
                 sx={{ textAlign: "left", marginBottom: "3%" }}

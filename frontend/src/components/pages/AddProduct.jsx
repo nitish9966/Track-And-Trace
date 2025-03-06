@@ -15,7 +15,6 @@ import QRCode from "qrcode.react";
 import dayjs from "dayjs";
 import useAuth from "../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import Geocode from "react-geocode";
 
 const getEthereumObject = () => window.ethereum;
 
@@ -56,14 +55,14 @@ const AddProduct = () => {
   // Manufacturer details (from profile/geolocation)
   const [manuDate, setManuDate] = useState("");
   const [manuLatitude, setManuLatitude] = useState("");
-  const [manuLongtitude, setManuLongtitude] = useState("");
-  const [manuName, setManuName] = useState(""); // actor to be stored in history
-  const [manuLocation, setManuLocation] = useState("");
+  const [manuLongtitude, setManuLongtitude] = useState(""); // Keeping original naming for consistency
+  const [manuName, setManuName] = useState("");
+  const [manuLocation, setManuLocation] = useState("Fetching location...");
 
   // For uniqueness check
   const [isUnique, setIsUnique] = useState(true);
 
-  // Blockchain contract details (if still needed)
+  // Blockchain contract details
   const CONTRACT_ADDRESS = "0x5BaAd2F8d16f2c32243aA12Dcb3bfE7D1ea67504";
   const contractABI = abi.abi;
 
@@ -85,7 +84,6 @@ const AddProduct = () => {
         if (res.data && res.data[0] && res.data[0].name) {
           setManuName(res.data[0].name);
         } else {
-          // Fallback: use auth.user if the API doesn't return a name
           setManuName(auth.user);
         }
       } catch (error) {
@@ -93,7 +91,6 @@ const AddProduct = () => {
           "❌ Error fetching username:",
           error.response?.data || error.message
         );
-        // Fallback to auth.user
         setManuName(auth.user);
       }
     };
@@ -112,24 +109,56 @@ const AddProduct = () => {
     fetchData();
   }, [auth?.user]);
 
-  // Geocode to get manufacturer location details
-  useEffect(() => {
-    Geocode.setApiKey("YOUR_GOOGLE_API_KEY_HERE");
-    if (manuLatitude && manuLongtitude) {
-      Geocode.fromLatLng(manuLatitude, manuLongtitude).then(
-        (response) => {
-          const address = response.results[0].formatted_address;
-          setManuLocation(address.replace(/,/g, ";"));
-          console.log("Address:", address);
-        },
-        (error) => {
-          console.error(error);
-        }
+  // Updated location code using Nominatim
+  const fetchLocation = async (lat, lon) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
+        {
+          headers: {
+            "User-Agent": "TestReactApp/1.0 (test@example.com)",
+          },
+        } // Replace with your email
       );
+      const data = await response.json();
+      setManuLocation(
+        data.display_name
+          ? data.display_name.replace(/,/g, ";")
+          : "Location not found"
+      );
+    } catch (error) {
+      setManuLocation("Failed to fetch location");
+      console.error("Error fetching location:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (manuLatitude && manuLongtitude) {
+      fetchLocation(manuLatitude, manuLongtitude);
     }
   }, [manuLatitude, manuLongtitude]);
 
-  // Generate QR Code data (if needed)
+  const getCurrentTimeLocation = () => {
+    setManuDate(dayjs().unix());
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setManuLatitude(position.coords.latitude);
+          setManuLongtitude(position.coords.longitude);
+        },
+        (error) => {
+          setManuLocation("Geolocation denied");
+          console.error("Geolocation error:", error);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      setManuLocation("Geolocation not supported");
+      console.error("Geolocation not supported by browser");
+    }
+  };
+
+  // Generate QR Code data
   const generateQRCode = async (serialNumber) => {
     const data = CONTRACT_ADDRESS + "," + serialNumber;
     setQrData(data);
@@ -161,7 +190,6 @@ const AddProduct = () => {
     });
   };
 
-  // Upload product image to backend
   const uploadImage = async (image) => {
     const data = new FormData();
     data.append("image", image.file);
@@ -179,7 +207,6 @@ const AddProduct = () => {
     }
   };
 
-  // Add product to the product table in DB
   const addProductDB = async () => {
     try {
       const productData = JSON.stringify({
@@ -202,12 +229,11 @@ const AddProduct = () => {
     }
   };
 
-  // Add product history to the product_history table in DB
   const addProductHistoryDB = async () => {
     try {
       const productHistoryData = JSON.stringify({
         serialNumber: serialNumber,
-        actor: manuName, // now using manuName (either from API or fallback to auth.user)
+        actor: manuName,
         location: manuLocation,
         timestamp: manuDate,
         is_sold: false,
@@ -226,7 +252,6 @@ const AddProduct = () => {
     }
   };
 
-  // (Optional) Blockchain registration – if still desired
   const registerProduct = async (e) => {
     try {
       const { ethereum } = window;
@@ -262,15 +287,6 @@ const AddProduct = () => {
     }
   };
 
-  const getCurrentTimeLocation = () => {
-    setManuDate(dayjs().unix());
-    navigator.geolocation.getCurrentPosition(function (position) {
-      setManuLatitude(position.coords.latitude);
-      setManuLongtitude(position.coords.longitude);
-    });
-  };
-
-  // Check if serial number is unique (from DB)
   const checkUnique = async () => {
     try {
       const res = await axios.get("http://localhost:5000/product/serialNumber");
@@ -286,7 +302,6 @@ const AddProduct = () => {
     }
   };
 
-  // Handle form submission: upload image, add product to DB, add product history, then (optionally) register on blockchain.
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -304,12 +319,12 @@ const AddProduct = () => {
 
     if (isUnique) {
       await uploadImage(image);
-      await addProductDB(); // Add to product table
-      await addProductHistoryDB(); // Add to product_history table
+      await addProductDB();
+      await addProductHistoryDB();
       setLoading(
         "Please pay the transaction fee to update the product details..."
       );
-      await registerProduct(e); // (Optional blockchain registration)
+      await registerProduct(e);
     } else {
       setLoading(
         "Serial Number already exists. Please use a unique serial number."

@@ -7,8 +7,7 @@ import {
   Autocomplete,
   Button,
 } from "@mui/material";
-import React from "react";
-import { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import bgImg from "../../img/back.png";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -19,16 +18,13 @@ const AddAccount = () => {
   const [user, setUser] = useState("");
   const [pwd, setPwd] = useState("");
   const [pwd2, setPwd2] = useState("");
-  const [role, setRole] = React.useState(options[0]);
+  const [role, setRole] = useState(options[0]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState("Fetching location...");
   const [errMsg, setErrMsg] = useState("");
-  const [image, setImage] = useState({
-    file: [],
-    filepreview: null,
-  });
+  const [image, setImage] = useState({ file: [], filepreview: null });
 
   const errRef = useRef();
   const navigate = useNavigate();
@@ -37,7 +33,53 @@ const AddAccount = () => {
     setErrMsg("");
   }, [user, pwd]);
 
-  const handleImage = async (e) => {
+  // Function to fetch location name using Nominatim API
+  const fetchLocation = async (latitude, longitude) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+        {
+          headers: {
+            "User-Agent": "TestReactApp/1.0 (test@example.com)", // Replace with your app name and email
+          },
+        }
+      );
+      const data = await response.json();
+      if (data && data.display_name) {
+        setLocation(data.display_name); // Set human-readable address
+      } else {
+        setLocation(""); // Allow manual entry if no result
+        setErrMsg("Location not found. Please enter manually.");
+      }
+    } catch (error) {
+      setLocation(""); // Allow manual entry on error
+      setErrMsg("Failed to fetch location. Please enter manually.");
+    }
+  };
+
+  // Get geolocation on mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          fetchLocation(latitude, longitude);
+        },
+        (error) => {
+          setLocation(""); // Allow manual entry if denied
+          setErrMsg(
+            "Geolocation access denied. Please enter location manually."
+          );
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      setLocation(""); // Allow manual entry if unsupported
+      setErrMsg("Geolocation not supported. Please enter location manually.");
+    }
+  }, []);
+
+  const handleImage = (e) => {
     setImage({
       ...image,
       file: e.target.files[0],
@@ -45,43 +87,8 @@ const AddAccount = () => {
     });
   };
 
-  // to upload image
-  const uploadImage = async (image) => {
-    const data = new FormData();
-    data.append("image", image.file);
-
-    axios
-      .post("http://localhost:5000/upload/profile", data, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
-      .then((res) => {
-        console.log(res);
-
-        if (res.data.success === 1) {
-          console.log("image uploaded");
-        }
-      });
-  };
-
-  const handleBack = () => {
-    navigate(-1);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // for debugging only
-    console.log("-----------------------------------");
-    console.log("user: " + user);
-    console.log("pwd: " + pwd);
-    console.log("pwd2: " + pwd2);
-    console.log("role: " + role);
-    console.log("image: " + image.file.name);
-    console.log("name: " + name);
-    console.log("description: " + description);
-    console.log("website: " + website);
-    console.log("location: " + location);
-
     try {
       const accountData = JSON.stringify({
         username: user,
@@ -94,32 +101,18 @@ const AddAccount = () => {
         name: name,
         description: description,
         website: website,
-        location: location,
+        location: location, // Use the fetched or manually entered location
         image: image.file.name,
         role: role,
       });
 
-      const res = await axios.post(
-        "http://localhost:5000/addaccount",
-        accountData,
-        {
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      await axios.post("http://localhost:5000/addaccount", accountData, {
+        headers: { "Content-Type": "application/json" },
+      });
 
-      console.log(JSON.stringify(res.data));
-
-      const res2 = await axios.post(
-        "http://localhost:5000/addprofile",
-        profileData,
-        {
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-
-      console.log(JSON.stringify(res2.data));
-
-      uploadImage(image);
+      await axios.post("http://localhost:5000/addprofile", profileData, {
+        headers: { "Content-Type": "application/json" },
+      });
 
       setUser("");
       setPwd("");
@@ -128,22 +121,10 @@ const AddAccount = () => {
       setName("");
       setDescription("");
       setWebsite("");
-      setLocation("");
-      setImage({
-        file: [],
-        filepreview: null,
-      });
+      setLocation("Fetching location..."); // Reset to fetch again on next load
+      setImage({ file: [], filepreview: null });
     } catch (err) {
-      if (!err?.response) {
-        setErrMsg("Server is down. Please try again later.");
-      } else if (err.response?.status === 400) {
-        setErrMsg("Invalid username or password.");
-      } else if (err.response?.status === 401) {
-        setErrMsg("Unauthorized access.");
-      } else {
-        setErrMsg("Login Failed. Please try again later.");
-      }
-      errRef.current.focus();
+      setErrMsg("Something went wrong. Try again.");
     }
   };
 
@@ -153,13 +134,7 @@ const AddAccount = () => {
         backgroundImage: `url(${bgImg})`,
         minHeight: "100vh",
         backgroundRepeat: "no-repeat",
-        position: "absolute",
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
         backgroundSize: "cover",
-        zIndex: -2,
         overflowY: "scroll",
       }}
     >
@@ -174,23 +149,13 @@ const AddAccount = () => {
           backgroundColor: "#e3eefc",
         }}
       >
-        <p
-          ref={errRef}
-          className={errMsg ? "errmsg" : "offscreen"}
-          aria-live="assertive"
-        >
+        <p ref={errRef} className={errMsg ? "errmsg" : "offscreen"}>
           {errMsg}
         </p>
 
         <Typography
           variant="h2"
-          sx={{
-            textAlign: "center",
-            marginBottom: "3%",
-            fontFamily: "Gambetta",
-            fontWeight: "bold",
-            fontSize: "2.5rem",
-          }}
+          sx={{ textAlign: "center", marginBottom: "3%", fontSize: "2.5rem" }}
         >
           Add Account
         </Typography>
@@ -198,47 +163,34 @@ const AddAccount = () => {
         <form onSubmit={handleSubmit}>
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Username"
             variant="outlined"
-            inherit="False"
             onChange={(e) => setUser(e.target.value)}
             value={user}
           />
-
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Password"
             type="password"
             variant="outlined"
-            inherit="False"
             onChange={(e) => setPwd(e.target.value)}
             value={pwd}
           />
-
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Confirm Password"
             type="password"
             variant="outlined"
-            inherit="False"
             onChange={(e) => setPwd2(e.target.value)}
             value={pwd2}
           />
-
-          {pwd == pwd2 ? null : (
+          {pwd !== pwd2 && (
             <Typography
               variant="body2"
-              sx={{
-                textAlign: "center",
-                fontSize: "12px",
-                color: "red",
-              }}
+              sx={{ textAlign: "center", fontSize: "12px", color: "red" }}
             >
               Passwords do not match
             </Typography>
@@ -246,22 +198,17 @@ const AddAccount = () => {
 
           <Autocomplete
             disablePortal
-            id="combo-box-demo"
             options={options}
             fullWidth
             value={role}
-            onChange={(event, newRole) => {
-              setRole(newRole);
-            }}
+            onChange={(event, newRole) => setRole(newRole)}
             renderInput={(params) => (
               <TextField
                 {...params}
                 fullWidth
-                id="outlined-basic"
                 margin="normal"
                 label="Role"
                 variant="outlined"
-                inherit="False"
               />
             )}
           />
@@ -270,65 +217,58 @@ const AddAccount = () => {
             variant="outlined"
             component="label"
             fullWidth
-            // onChange = {handleImage}
             sx={{ marginTop: "3%" }}
           >
             Upload Image
             <input type="file" hidden onChange={handleImage} />
           </Button>
 
-          {image.filepreview !== null ? (
+          {image.filepreview && (
             <img
               src={image.filepreview}
               alt="preview"
               style={{ width: "100%", height: "100%" }}
             />
-          ) : null}
+          )}
 
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Name"
             variant="outlined"
-            inherit="False"
             onChange={(e) => setName(e.target.value)}
             value={name}
           />
-
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Description"
             variant="outlined"
-            inherit="False"
             multiline
             minRows={2}
             onChange={(e) => setDescription(e.target.value)}
             value={description}
           />
-
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Website"
             variant="outlined"
-            inherit="False"
             onChange={(e) => setWebsite(e.target.value)}
             value={website}
           />
 
+          {/* Editable Location Field */}
           <TextField
             fullWidth
-            id="outlined-basic"
             margin="normal"
             label="Location"
             variant="outlined"
-            inherit="False"
-            onChange={(e) => setLocation(e.target.value)}
+            InputProps={{ readOnly: true }}
+            disabled
             value={location}
+            onChange={(e) => setLocation(e.target.value)} // Allow manual edits
+            helperText="Automatically fetched or enter manually"
           />
 
           <Button
@@ -345,22 +285,28 @@ const AddAccount = () => {
           </Button>
 
           <Box
-            sx={{
-              width: "100%",
-              display: "flex",
-              justifyContent: "center",
-            }}
+            sx={{ width: "100%", display: "flex", justifyContent: "center" }}
           >
-            <Button
-              onClick={handleBack}
-              sx={{
-                marginTop: "5%",
-              }}
-            >
+            <Button onClick={() => navigate(-1)} sx={{ marginTop: "5%" }}>
               Back
             </Button>
           </Box>
         </form>
+
+        {/* OpenStreetMap Attribution */}
+        <Typography
+          variant="body2"
+          sx={{ textAlign: "center", marginTop: "2%", fontSize: "0.8rem" }}
+        >
+          Location data ©{" "}
+          <a
+            href="https://www.openstreetmap.org/copyright"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            OpenStreetMap contributors
+          </a>
+        </Typography>
       </Paper>
     </Box>
   );
